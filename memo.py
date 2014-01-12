@@ -1,4 +1,11 @@
-import pytables
+from tables import *
+
+# class MemoObject(IsDescription):
+#     index = UInt16Col()
+#     content = StringCol(200)
+
+# h5file = openFile("test.h5", mode="w+", title="Test")
+# table = h5file.createTable(h5file.root, "test", MemoObject, "Test example")
 
 class Memo(object):
     """Gives back the index number if object already exists, or stores
@@ -25,3 +32,6 @@ class Memo(object):
 
     def __len__(self):
         return(len(self.store))
+
+    def toHash(self):
+        return({v:k for k, v in self.store.items()})

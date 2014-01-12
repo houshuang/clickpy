@@ -1,0 +1,2 @@
+np.array([1368431149, 1368431150]).astype('datetime64[s]')
+convert epoch to Pandas datetime
