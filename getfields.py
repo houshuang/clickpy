@@ -1,3 +1,5 @@
+exit(1)  # so I don't run it by mistake anymore
+
 import re
 import sys
 import os

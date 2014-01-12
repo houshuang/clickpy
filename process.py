@@ -12,7 +12,7 @@ from collections import Counter
 from datetime import datetime
 
 C = 0
-
+ipy
 unwanted_fields = ['data', 'user_ip', '12', '13', 'language', 'from',
     'user_agent', 12, 13, 'page_url', 'client', 'networkState',
     'visiting', 'error', 'lecture_player', 'minimal', 'readyState',
@@ -22,6 +22,8 @@ memoizable_fields = ['action', 'page', 'quiz_id', 'type', 'visiting',
 timestamp_fields = ['initTimestamp', 'eventTimestamp', 'timestamp']
 
 memos = {key:memo.Memo() for key in memoizable_fields}
+
+db = DataFrame()
 
 def unwrap_hash(h):
     return( {k:v[0] for k,v in h.items()} )
@@ -60,6 +62,8 @@ def nan_or_timestamp(val):
         val = datetime.fromtimestamp(int(val) / 1000.)
     return val
 
+def inject_df(vals):
+    db.join()
 
 def main(fname):
     
@@ -67,7 +71,7 @@ def main(fname):
 
     arr = []
     with open(fname) as f:
-        for line in f:
+        for i, line in enumerate(f):
             parsestr = ujson.loads(line)
 
             if parsestr['key'] == "user.video.lecture.action":
@@ -78,11 +82,15 @@ def main(fname):
 
             arr.append(memoize(parsestr))
 
-    db = DataFrame(arr)
+            if (i/1000 == i//1000):
+                db.append(DataFrame(arr), ignore_index=True)
+                arr = []
 
+    # convert epoch in milliseconds to datetime
     for col in timestamp_fields:
         db[col] = db[col].apply(nan_or_timestamp)
-    print(db)
+    
+
     for col in db.columns:
         print("%s: %i, %i" % (col, db[col].count(), len(db[col].unique())))
     return(db)

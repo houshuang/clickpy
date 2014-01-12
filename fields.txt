@@ -4,7 +4,6 @@ unwanted_fields = ['data', 'user_ip', '12', '13', 'language', 'from',
 memoizable_fields = ['action', 'page', 'quiz_id', 'type', 'visiting',
 	'key']
 
-
 Starting...
     action client  currentTime  error  eventTimestamp forum_id  initTimestamp  \
 0        1  spark          NaN    NaN             NaN      NaN            NaN   
