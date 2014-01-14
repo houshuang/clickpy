@@ -13,11 +13,13 @@ from datetime import datetime
 
 C = 0
 
-unwanted_fields = ['data', 'user_ip', '12', '13', 'language', 'from',
-    'user_agent', 12, 13, 'page_url', 'client', 'networkState',
-    'visiting', 'error', 'lecture_player', 'minimal', 'readyState',
-    'user_id', 'value'] 
-memoizable_fields = ['action', 'page', 'quiz_id', 'type', 'visiting',
+# we should be able to remove these by inference, by explicily whitelisting
+# columns using columns=cols
+#unwanted_fields = ['data', 'user_ip', '12', '13', 'language', 'from',
+    # 'user_agent', 12, 13, 'page_url', 'client', 'networkState',
+    # 'visiting', 'error', 'lecture_player', 'minimal', 'readyState',
+    # 'user_id', 'value'] 
+memoizable_fields = ['action', 'page', 'type', 'visiting',
     'key', 'session', 'username']
 
 timestamp_fields = ['initTimestamp', 'eventTimestamp', 'timestamp']
@@ -28,6 +30,14 @@ cols = ['action', 'currentTime', 'eventTimestamp', 'forum_id',
         'submission_id', 'thread_id', 'timestamp', 'type', 'username']
 
 memos = {key:memo.Memo(key) for key in memoizable_fields}
+notnumber = re.compile('[^\d]')
+
+def clean_number(nstr):
+    try:
+        a = int(notnumber.sub('', nstr))
+    except:
+        a = np.NaN
+    return(a)
 
 def unwrap_hash(h):
     return( {k:v[0] for k,v in h.items()} )
@@ -57,22 +67,12 @@ def get_prefix_size(fname):
         prefix = r"https://class.coursera.org/(.+?)/"
         return(len(re.match(prefix, firstparse['page_url']).group(0)))
 
-
-def clean_fields(action):
-    # remove fields we don't care about
-    for field in unwanted_fields:
-        if field in action: del action[field]
-    return(action)
-
-
 def memoize(action):
-    # remove fields we don't care about
-    action = clean_fields(action)
-    
     # memoize fields
     for field, memoizer in memos.items():
         if field in action:
             action[field] = memoizer[action[field]]
+
     return action
 
 def nan_or_timestamp(val):
@@ -82,8 +82,20 @@ def nan_or_timestamp(val):
         val = pd.NaT
     return val
 
+npobj = np.dtype('O')
+
 def storeappend(store, arr):
-    store.append('db', clean_fields(DataFrame(arr, dtype=np.float64, columns=cols)))
+    a = DataFrame(arr, dtype=np.float64, columns=cols)
+    
+    # we need to remove the strings and cast to integer
+    for col in a.columns:
+        if a[col].dtype == npobj:
+            a[col] = a[col].apply(clean_number)
+            a[col] = a[col].astype(np.uint8)
+
+    store.append('db', a)
+    del a
+
 
 def main(fname, test):
     prefix_size = get_prefix_size(fname)
@@ -127,7 +139,6 @@ def main(fname, test):
 if __name__ == "__main__":
 
     print("Starting...")
-    fname = "/Users/Stian/src/clickpy/introstats_001_10k"
     if len(sys.argv) > 1:
         fname = sys.argv[1]
     if len(sys.argv) > 2:
