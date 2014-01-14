@@ -12,7 +12,7 @@ from collections import Counter
 from datetime import datetime
 
 C = 0
-ipy
+
 unwanted_fields = ['data', 'user_ip', '12', '13', 'language', 'from',
     'user_agent', 12, 13, 'page_url', 'client', 'networkState',
     'visiting', 'error', 'lecture_player', 'minimal', 'readyState',
@@ -21,12 +21,15 @@ memoizable_fields = ['action', 'page', 'quiz_id', 'type', 'visiting',
     'key', 'session', 'username']
 timestamp_fields = ['initTimestamp', 'eventTimestamp', 'timestamp']
 
-memos = {key:memo.Memo() for key in memoizable_fields}
-
-db = DataFrame()
+memos = {key:memo.Memo(key) for key in memoizable_fields}
 
 def unwrap_hash(h):
     return( {k:v[0] for k,v in h.items()} )
+
+def clean_value(v):
+    if '#' in v:
+        v = v.split('#')[0]
+    return(v)
 
 def parse(url, prefix_size):
 
@@ -34,7 +37,9 @@ def parse(url, prefix_size):
     action = {'action': url[prefix_size:]}
 
     if part:
-        action.update(unwrap_hash(parse_qs(part[0])))
+        items = unwrap_hash(parse_qs(part[0]))
+        items = {k:clean_value(v) for k,v in items.items()}
+        action.update(items)
 
     return(action)
 
@@ -60,16 +65,23 @@ def memoize(action):
 def nan_or_timestamp(val):
     if not (pd.isnull(val)):
         val = datetime.fromtimestamp(int(val) / 1000.)
+    else:
+        val = pd.NaT
     return val
 
-def inject_df(vals):
-    db.join()
+def main(fname, test):
+    db = DataFrame()
+    cols = ['action', 'currentTime', 'eventTimestamp', 'forum_id', 
+        'initTimestamp', 'key', 'lecture_id', 'page', 'paused', 
+        'playbackRate', 'post_id', 'prevTime', 'quiz_id', 'session', 
+        'submission_id', 'thread_id', 'timestamp', 'type', 'username']
 
-def main(fname):
-    
     prefix_size = get_prefix_size(fname)
 
     arr = []
+    hdf = fname+(".h5")
+ 
+    store = pd.HDFStore(hdf, "w")
     with open(fname) as f:
         for i, line in enumerate(f):
             parsestr = ujson.loads(line)
@@ -82,23 +94,35 @@ def main(fname):
 
             arr.append(memoize(parsestr))
 
-            if (i/1000 == i//1000):
-                db.append(DataFrame(arr), ignore_index=True)
+            if (i/10000 == i//10000) and i>100:
+                print(i)
+                store.append('db', DataFrame(arr, dtype=np.float64, columns=cols)) 
                 arr = []
+                if test:
+                    break
 
     # convert epoch in milliseconds to datetime
-    for col in timestamp_fields:
-        db[col] = db[col].apply(nan_or_timestamp)
-    
+    # for col in timestamp_fields:
+    #     if col in db:
+    #         db[col] = db[col].apply(nan_or_timestamp)
 
-    for col in db.columns:
-        print("%s: %i, %i" % (col, db[col].count(), len(db[col].unique())))
+    print("Storing memoized data")
+    for field, memoizer in memos.items():
+        print(memoizer)
+        memoizer.store(store)
+
     return(db)
+
 
 
 if __name__ == "__main__":
 
     print("Starting...")
     fname = "/Users/Stian/src/clickpy/introstats_001_10k"
-
-    db=main(fname)
+    if len(sys.argv) > 1:
+        fname = sys.argv[1]
+    if len(sys.argv) > 2:
+        test = True
+    else:
+        test = False
+    db=main(fname, test)

@@ -1,4 +1,4 @@
-from tables import *
+import pandas as pd
 
 # class MemoObject(IsDescription):
 #     index = UInt16Col()
@@ -18,20 +18,24 @@ class Memo(object):
     a['http://reganmian.net'] # => 1
     """
 
-    def __init__(self):
-        self.store = {}
+    def __init__(self, name):
+        self.db = {}
         self.counter = 0
+        self.name = name
 
     def __getitem__(self, s):
-        if s in self.store:
-            return self.store[s]
+        if s in self.db:
+            return self.db[s]
         else:
             self.counter += 1
-            self.store[s] = self.counter
+            self.db[s] = self.counter
             return self.counter
 
     def __len__(self):
-        return(len(self.store))
+        return(len(self.db))
 
     def toHash(self):
-        return({v:k for k, v in self.store.items()})
+        return({v:k for k, v in self.db.items()})
+
+    def store(self, store):
+        store[self.name] = pd.Series(list(self.db.keys()), list(self.db.values()))
