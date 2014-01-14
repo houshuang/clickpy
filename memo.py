@@ -19,13 +19,14 @@ class Memo(object):
     """
 
     def __init__(self, name):
-        self.db = {}
+        self.db = pd.Series()
         self.counter = 0
         self.name = name
 
     def __getitem__(self, s):
-        if s in self.db:
-            return self.db[s]
+        item = self.db.get(s)
+        if item:
+            return item
         else:
             self.counter += 1
             self.db[s] = self.counter
@@ -34,8 +35,5 @@ class Memo(object):
     def __len__(self):
         return(len(self.db))
 
-    def toHash(self):
-        return({v:k for k, v in self.db.items()})
-
     def store(self, store):
-        store[self.name] = pd.Series(list(self.db.keys()), list(self.db.values()))
+        store[self.name] = self.db

@@ -19,7 +19,13 @@ unwanted_fields = ['data', 'user_ip', '12', '13', 'language', 'from',
     'user_id', 'value'] 
 memoizable_fields = ['action', 'page', 'quiz_id', 'type', 'visiting',
     'key', 'session', 'username']
+
 timestamp_fields = ['initTimestamp', 'eventTimestamp', 'timestamp']
+
+cols = ['action', 'currentTime', 'eventTimestamp', 'forum_id', 
+        'initTimestamp', 'key', 'lecture_id', 'page', 'paused', 
+        'playbackRate', 'post_id', 'prevTime', 'quiz_id', 'session', 
+        'submission_id', 'thread_id', 'timestamp', 'type', 'username']
 
 memos = {key:memo.Memo(key) for key in memoizable_fields}
 
@@ -51,14 +57,21 @@ def get_prefix_size(fname):
         prefix = r"https://class.coursera.org/(.+?)/"
         return(len(re.match(prefix, firstparse['page_url']).group(0)))
 
-def memoize(action):
+
+def clean_fields(action):
     # remove fields we don't care about
     for field in unwanted_fields:
         if field in action: del action[field]
+    return(action)
 
+
+def memoize(action):
+    # remove fields we don't care about
+    action = clean_fields(action)
+    
     # memoize fields
     for field, memoizer in memos.items():
-        if field in action: 
+        if field in action:
             action[field] = memoizer[action[field]]
     return action
 
@@ -69,13 +82,10 @@ def nan_or_timestamp(val):
         val = pd.NaT
     return val
 
-def main(fname, test):
-    db = DataFrame()
-    cols = ['action', 'currentTime', 'eventTimestamp', 'forum_id', 
-        'initTimestamp', 'key', 'lecture_id', 'page', 'paused', 
-        'playbackRate', 'post_id', 'prevTime', 'quiz_id', 'session', 
-        'submission_id', 'thread_id', 'timestamp', 'type', 'username']
+def storeappend(store, arr):
+    store.append('db', clean_fields(DataFrame(arr, dtype=np.float64, columns=cols)))
 
+def main(fname, test):
     prefix_size = get_prefix_size(fname)
 
     arr = []
@@ -96,7 +106,7 @@ def main(fname, test):
 
             if (i/10000 == i//10000) and i>100:
                 print(i)
-                store.append('db', DataFrame(arr, dtype=np.float64, columns=cols)) 
+                storeappend(store, arr)
                 arr = []
                 if test:
                     break
@@ -106,14 +116,13 @@ def main(fname, test):
     #     if col in db:
     #         db[col] = db[col].apply(nan_or_timestamp)
 
+    # ensure last batch is stored
+    storeappend(store, arr)
+
     print("Storing memoized data")
     for field, memoizer in memos.items():
         print(memoizer)
         memoizer.store(store)
-
-    return(db)
-
-
 
 if __name__ == "__main__":
 
@@ -125,4 +134,5 @@ if __name__ == "__main__":
         test = True
     else:
         test = False
-    db=main(fname, test)
+    
+    main(fname, test)
