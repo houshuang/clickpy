@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 # class MemoObject(IsDescription):
 #     index = UInt16Col()
@@ -23,14 +24,19 @@ class Memo(object):
         self.counter = 0
         self.name = name
 
-    def __getitem__(self, s):
+    def get(self, s):
+        if s is None:
+            return(np.NaN)
+
         item = self.db.get(s)
+        if item is None:
+            return(np.NaN)
         if item:
             return item
         else:
             self.counter += 1
             self.db[s] = self.counter
-            return self.counter
+            return self.counter            
 
     def __len__(self):
         return(len(self.db))

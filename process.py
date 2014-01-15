@@ -10,6 +10,9 @@ from urllib.parse import parse_qs
 import memo
 from collections import Counter
 from datetime import datetime
+from multiprocessing import Pool
+from itertools import islice
+from functools import partial
 
 C = 0
 
@@ -67,13 +70,12 @@ def get_prefix_size(fname):
         prefix = r"https://class.coursera.org/(.+?)/"
         return(len(re.match(prefix, firstparse['page_url']).group(0)))
 
-def memoize(action):
+def memoize(df):
     # memoize fields
     for field, memoizer in memos.items():
-        if field in action:
-            action[field] = memoizer[action[field]]
-
-    return action
+        if field in df.columns:
+            df[field].apply(memoizer.get)
+    return df
 
 def nan_or_timestamp(val):
     if not (pd.isnull(val)):
@@ -85,56 +87,57 @@ def nan_or_timestamp(val):
 npobj = np.dtype('O')
 
 def storeappend(store, arr):
-    a = DataFrame(arr, dtype=np.float64, columns=cols)
-    
+    if not arr or arr == []:
+        return
+    a = DataFrame(arr, columns=cols)
+    a = memoize(a)
+
     # we need to remove the strings and cast to integer
     for col in a.columns:
         if a[col].dtype == npobj:
             a[col] = a[col].apply(clean_number)
-            a[col] = a[col].astype(np.uint8)
+            a[col] = a[col].astype(np.float64)
 
     store.append('db', a)
     del a
 
+def process(prefix_size, line):
+    parsestr = ujson.loads(line)
+
+    if parsestr['key'] == "user.video.lecture.action":
+        parsestr.update(ujson.loads(parsestr["value"]))
+
+    urlparse = parse(parsestr['page_url'], prefix_size)
+    parsestr.update(urlparse)
+    return(parsestr)
+
+# 4, 10,000 : 17
+# 8, 10,000 : 17
 
 def main(fname, test):
     prefix_size = get_prefix_size(fname)
+    procfunc = partial(process, prefix_size)
 
     arr = []
     hdf = fname+(".h5")
  
     store = pd.HDFStore(hdf, "w")
+    p = Pool(16)
     with open(fname) as f:
-        for i, line in enumerate(f):
-            parsestr = ujson.loads(line)
+        i = 0
+        while True:
+            i += 1
+            lines = list(islice(f, 100000))
+            if not lines or lines == []:
+                break
+        
+            arr = p.map(procfunc, lines)
+            storeappend(store, arr)
 
-            if parsestr['key'] == "user.video.lecture.action":
-                parsestr.update(ujson.loads(parsestr["value"]))
-
-            urlparse = parse(parsestr['page_url'], prefix_size)
-            parsestr.update(urlparse)
-
-            arr.append(memoize(parsestr))
-
-            if (i/10000 == i//10000) and i>100:
-                print(i)
-                storeappend(store, arr)
-                arr = []
-                if test:
-                    break
-
-    # convert epoch in milliseconds to datetime
-    # for col in timestamp_fields:
-    #     if col in db:
-    #         db[col] = db[col].apply(nan_or_timestamp)
-
-    # ensure last batch is stored
-    storeappend(store, arr)
-
-    print("Storing memoized data")
-    for field, memoizer in memos.items():
-        print(memoizer)
-        memoizer.store(store)
+            print(i*10000)
+            arr = []
+            if test:
+                break
 
 if __name__ == "__main__":
 
