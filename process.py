@@ -8,7 +8,7 @@ import sys
 import ujson
 from urllib.parse import parse_qs
 import memo
-from collections import Counter
+from collections import Counter, Iterable
 from datetime import datetime
 from multiprocessing import Pool
 from itertools import islice
@@ -86,11 +86,25 @@ def nan_or_timestamp(val):
 
 npobj = np.dtype('O')
 
+# flatten only once - ugly, what's a better way?
+def flatten(items, onlyonce=True): 
+    for x in items:
+        if onlyonce:
+            yield from flatten(x, False)
+        else:
+            yield x
+
+
 def storeappend(store, arr):
     if not arr or arr == []:
         return
-    a = DataFrame(arr, columns=cols)
-    a = memoize(a)
+
+    try:
+        a = list(flatten(arr))
+        a = DataFrame(a, columns=cols)
+        a = memoize(a)
+    except:
+        print(a)
 
     # we need to remove the strings and cast to integer
     for col in a.columns:
@@ -101,18 +115,25 @@ def storeappend(store, arr):
     store.append('db', a)
     del a
 
-def process(prefix_size, line):
-    parsestr = ujson.loads(line)
+def process(prefix_size, linechunk):
+    arr = []
+    for line in linechunk:
+        if not linechunk or linechunk == [] or len(linechunk) == 0:
+            next
+        parsestr = ujson.loads(line)
 
-    if parsestr['key'] == "user.video.lecture.action":
-        parsestr.update(ujson.loads(parsestr["value"]))
+        if parsestr['key'] == "user.video.lecture.action":
+            parsestr.update(ujson.loads(parsestr["value"]))
 
-    urlparse = parse(parsestr['page_url'], prefix_size)
-    parsestr.update(urlparse)
-    return(parsestr)
+        urlparse = parse(parsestr['page_url'], prefix_size)
+        parsestr.update(urlparse)
+        arr.append(parsestr)
+    return(arr)
 
 # 4, 10,000 : 17
 # 8, 10,000 : 17
+# no effect of parallelization? too small chunks? try bigger chunks, 
+# or on server... 
 
 def main(fname, test):
     prefix_size = get_prefix_size(fname)
@@ -122,16 +143,18 @@ def main(fname, test):
     hdf = fname+(".h5")
  
     store = pd.HDFStore(hdf, "w")
-    p = Pool(16)
+    p = Pool(4)
     with open(fname) as f:
         i = 0
         while True:
             i += 1
-            lines = list(islice(f, 100000))
+            lines = list(islice(f, 200000))
             if not lines or lines == []:
                 break
+            linechunks = [list(islice(lines, 50000)),list(islice(lines, 50000)),
+                list(islice(lines, 50000)),list(islice(lines, 50000))]
         
-            arr = p.map(procfunc, lines)
+            arr = p.map(procfunc, linechunks)
             storeappend(store, arr)
 
             print(i*10000)
