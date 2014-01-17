@@ -162,6 +162,14 @@ def main(fname, test):
             if test:
                 break
 
+    print("Storing memoized data")
+    for field, memoizer in memos.items():
+        print(memoizer)
+        memoizer.store(store)
+
+    store.close()
+    print("Finished")
+
 if __name__ == "__main__":
 
     print("Starting...")
