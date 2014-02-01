@@ -31,11 +31,6 @@ cols = ['action', 'currentTime', 'eventTimestamp', 'forum_id',
         'playbackRate', 'post_id', 'prevTime', 'quiz_id', 'session',
         'submission_id', 'thread_id', 'timestamp', 'type', 'username']
 
-# precompiling regexps for speed
-num_re = re.compile("\d")
-not_num_re = re.compile('[^\d]')
-human_grading_re = re.compile("human_grading/view/courses/\d+/assessments/\d+/(.+?)/\d*")
-lecture_re = re.compile("lecture/(\d+)")
 
 def clean_number(nstr):
     try:
@@ -53,6 +48,13 @@ def clean_value(v):
     return(v)
 
 
+# precompiling regexps for speed
+num_re = re.compile("\d")
+not_num_re = re.compile('[^\d]')
+human_grading_re = re.compile("human_grading/view/courses/\d+/assessments/\d+/?(.+?)?/*\d*$")
+human_grading_2 = re.compile("^human_grading/")
+lecture_re = re.compile("lecture/(\d+)")
+
 def parse(url, prefix_size):
     url, *part = url.strip().split('?', 1)
 
@@ -60,23 +62,29 @@ def parse(url, prefix_size):
     # even if there is no "#", getting the first element will always
     # work
     actionstr = url[prefix_size:].split("#")[0]
+    action = {}
 
     # first check if any numbers, to skip longer matches
-    if re.match(num_re, actionstr):
+    if re.search(num_re, actionstr):
 
         # special parsing for human grading actions
         match = re.match(human_grading_re, actionstr)
         if not match is None:
-            actionstr = "human_grading/" + match.groups()[0]
-            action = {'action': actionstr}
+            actionstr = "human_grading/"
+            if match.groups()[0]:
+                actionstr = actionstr + match.groups()[0]
+            return({'action': actionstr})
 
         # special parsing for lecture_views, otherwise proceed as normal
         match = re.match(lecture_re, actionstr)
         if not match is None:
-            action = {'action': 'lecture_view',
-                      'lecture_id': match.groups()[0]}
+            return({'action': 'lecture_view',
+                      'lecture_id': match.groups()[0]})
         else:
-            print("Uncaught numeric action: ", actionstr)
+            if re.search(human_grading_2, actionstr):
+                return({'action': 'human_grading/'})
+            else:
+                print("Uncaught numeric action: ", actionstr)
 
     else:
         action = {'action': actionstr}
@@ -176,6 +184,7 @@ def main(fname, test):
     arr = []
     hdf = fname+(".h5")
 
+    os.remove(hdf)
     store = pd.HDFStore(hdf, "w")
     p = Pool(4)
     with open(fname) as f:
