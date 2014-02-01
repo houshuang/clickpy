@@ -1,2 +1,5 @@
 np.array([1368431149, 1368431150]).astype('datetime64[s]')
 convert epoch to Pandas datetime
+
+
+size of introstats_001_10k with floats is 2466503057

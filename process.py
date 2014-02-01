@@ -1,39 +1,41 @@
+import os
 import re
 import sys
-import os
+import ujson
+from collections import Counter, Iterable
+from datetime import datetime
+from functools import partial
+from itertools import islice
+from multiprocessing import Pool
+from urllib.parse import parse_qs
+
 from pandas import DataFrame, Series
 import pandas as pd
 import numpy as np
-import sys
-import ujson
-from urllib.parse import parse_qs
+
 import memo
-from collections import Counter, Iterable
-from datetime import datetime
-from multiprocessing import Pool
-from itertools import islice
-from functools import partial
 
-C = 0
-
-# we should be able to remove these by inference, by explicily whitelisting
-# columns using columns=cols
-#unwanted_fields = ['data', 'user_ip', '12', '13', 'language', 'from',
-    # 'user_agent', 12, 13, 'page_url', 'client', 'networkState',
-    # 'visiting', 'error', 'lecture_player', 'minimal', 'readyState',
-    # 'user_id', 'value'] 
+# fields that will be automatically memoized
 memoizable_fields = ['action', 'page', 'type', 'visiting',
-    'key', 'session', 'username']
+                     'key', 'session', 'username']
+memos = {key:memo.Memo(key) for key in memoizable_fields}
 
+# we'll strip off the nanosecond counter
+# timestamp conversion is easier with Pandas afterwards
 timestamp_fields = ['initTimestamp', 'eventTimestamp', 'timestamp']
 
-cols = ['action', 'currentTime', 'eventTimestamp', 'forum_id', 
-        'initTimestamp', 'key', 'lecture_id', 'page', 'paused', 
-        'playbackRate', 'post_id', 'prevTime', 'quiz_id', 'session', 
+# these are the columns that we are keeping, all others are
+# removed
+cols = ['action', 'currentTime', 'eventTimestamp', 'forum_id',
+        'initTimestamp', 'key', 'lecture_id', 'page', 'paused',
+        'playbackRate', 'post_id', 'prevTime', 'quiz_id', 'session',
         'submission_id', 'thread_id', 'timestamp', 'type', 'username']
 
-memos = {key:memo.Memo(key) for key in memoizable_fields}
-notnumber = re.compile('[^\d]')
+# precompiling regexps for speed
+num_re = re.compile("\d")
+not_num_re = re.compile('[^\d]')
+human_grading_re = re.compile("human_grading/view/courses/\d+/assessments/\d+/(.+?)/\d*")
+lecture_re = re.compile("lecture/(\d+)")
 
 def clean_number(nstr):
     try:
@@ -50,11 +52,36 @@ def clean_value(v):
         v = v.split('#')[0]
     return(v)
 
+
 def parse(url, prefix_size):
-
     url, *part = url.strip().split('?', 1)
-    action = {'action': url[prefix_size:]}
 
+    # we remove the course prefix and everything after # from URL string
+    # even if there is no "#", getting the first element will always
+    # work
+    actionstr = url[prefix_size:].split("#")[0]
+
+    # first check if any numbers, to skip longer matches
+    if re.match(num_re, actionstr):
+
+        # special parsing for human grading actions
+        match = re.match(human_grading_re, actionstr)
+        if not match is None:
+            actionstr = "human_grading/" + match.groups()[0]
+            action = {'action': actionstr}
+
+        # special parsing for lecture_views, otherwise proceed as normal
+        match = re.match(lecture_re, actionstr)
+        if not match is None:
+            action = {'action': 'lecture_view',
+                      'lecture_id': match.groups()[0]}
+        else:
+            print("Uncaught numeric action: ", actionstr)
+
+    else:
+        action = {'action': actionstr}
+
+    # process any url arguments (?arg=opt)
     if part:
         items = unwrap_hash(parse_qs(part[0]))
         items = {k:clean_value(v) for k,v in items.items()}
@@ -70,24 +97,18 @@ def get_prefix_size(fname):
         prefix = r"https://class.coursera.org/(.+?)/"
         return(len(re.match(prefix, firstparse['page_url']).group(0)))
 
+
 def memoize(df):
-    # memoize fields
+    """Runs through list of fields to memoize, and returns
+    new dataframe with all fields memoized"""
     for field, memoizer in memos.items():
         if field in df.columns:
-            df[field].apply(memoizer.get)
+            df[field] = df[field].apply(memoizer.get)
     return df
 
-def nan_or_timestamp(val):
-    if not (pd.isnull(val)):
-        val = datetime.fromtimestamp(int(val) / 1000.)
-    else:
-        val = pd.NaT
-    return val
-
-npobj = np.dtype('O')
 
 # flatten only once - ugly, what's a better way?
-def flatten(items, onlyonce=True): 
+def flatten(items, onlyonce=True):
     for x in items:
         if onlyonce:
             yield from flatten(x, False)
@@ -95,25 +116,37 @@ def flatten(items, onlyonce=True):
             yield x
 
 
+Npobj = np.dtype('O')
+
 def storeappend(store, arr):
     if not arr or arr == []:
         return
 
-    try:
-        a = list(flatten(arr))
-        a = DataFrame(a, columns=cols)
-        a = memoize(a)
-    except:
-        print(a)
+    a = list(flatten(arr))
+    a = DataFrame(a, columns=cols)
+    a = memoize(a)
 
-    # we need to remove the strings and cast to integer
+    # there should not be any strings left, but we need to clean the
+    # numbers and convert to floats
     for col in a.columns:
-        if a[col].dtype == npobj:
+        if a[col].dtype == Npobj:
             a[col] = a[col].apply(clean_number)
             a[col] = a[col].astype(np.float64)
 
     store.append('db', a)
     del a
+
+
+def fix_timestamp(parsestr):
+    """Remove last three digits (nanoseconds) from all timestamp fields"""
+    for field in timestamp_fields:
+        if field in parsestr:
+            if isinstance(parsestr[field], int):
+                parsestr[field] = parsestr[field]/1000
+            elif isinstance(parsestr[field], str):
+                parsestr[field] = parsestr[field][:-3]
+    return(parsestr)
+
 
 def process(prefix_size, linechunk):
     arr = []
@@ -127,13 +160,14 @@ def process(prefix_size, linechunk):
 
         urlparse = parse(parsestr['page_url'], prefix_size)
         parsestr.update(urlparse)
+        parsestr = fix_timestamp(parsestr)
         arr.append(parsestr)
     return(arr)
 
 # 4, 10,000 : 17
 # 8, 10,000 : 17
-# no effect of parallelization? too small chunks? try bigger chunks, 
-# or on server... 
+# no effect of parallelization? too small chunks? try bigger chunks,
+# or on server...
 
 def main(fname, test):
     prefix_size = get_prefix_size(fname)
@@ -141,7 +175,7 @@ def main(fname, test):
 
     arr = []
     hdf = fname+(".h5")
- 
+
     store = pd.HDFStore(hdf, "w")
     p = Pool(4)
     with open(fname) as f:
@@ -153,18 +187,17 @@ def main(fname, test):
                 break
             linechunks = [list(islice(lines, 50000)),list(islice(lines, 50000)),
                 list(islice(lines, 50000)),list(islice(lines, 50000))]
-        
+
             arr = p.map(procfunc, linechunks)
             storeappend(store, arr)
 
-            print(i*10000)
+            print(i*200000)
             arr = []
             if test:
                 break
 
     print("Storing memoized data")
     for field, memoizer in memos.items():
-        print(memoizer)
         memoizer.store(store)
 
     store.close()
@@ -179,5 +212,5 @@ if __name__ == "__main__":
         test = True
     else:
         test = False
-    
+
     main(fname, test)

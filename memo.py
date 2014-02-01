@@ -1,13 +1,6 @@
 import pandas as pd
 import numpy as np
 
-# class MemoObject(IsDescription):
-#     index = UInt16Col()
-#     content = StringCol(200)
-
-# h5file = openFile("test.h5", mode="w+", title="Test")
-# table = h5file.createTable(h5file.root, "test", MemoObject, "Test example")
-
 class Memo(object):
     """Gives back the index number if object already exists, or stores
     and returns index
@@ -25,18 +18,19 @@ class Memo(object):
         self.name = name
 
     def get(self, s):
-        if s is None:
+        if s is None or s is np.NaN:
             return(np.NaN)
 
         item = self.db.get(s)
-        if item is None:
-            return(np.NaN)
         if item:
             return item
         else:
             self.counter += 1
             self.db[s] = self.counter
-            return self.counter            
+            return self.counter
+
+    def __getitem__(self, s):
+        return(self.get(s))
 
     def __len__(self):
         return(len(self.db))
