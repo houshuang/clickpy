@@ -52,7 +52,6 @@ def clean_value(v):
 num_re = re.compile("\d")
 not_num_re = re.compile('[^\d]')
 human_grading_re = re.compile("human_grading/view/courses/\d+/assessments/\d+/?(.+?)?/*\d*$")
-human_grading_2 = re.compile("^human_grading/")
 lecture_re = re.compile("lecture/(\d+)")
 
 def parse(url, prefix_size):
@@ -63,10 +62,8 @@ def parse(url, prefix_size):
     # work
     actionstr = url[prefix_size:].split("#")[0]
     action = {}
-
     # first check if any numbers, to skip longer matches
     if re.search(num_re, actionstr):
-
         # special parsing for human grading actions
         match = re.match(human_grading_re, actionstr)
         if not match is None:
@@ -76,18 +73,17 @@ def parse(url, prefix_size):
             return({'action': actionstr})
 
         # special parsing for lecture_views, otherwise proceed as normal
-        match = re.match(lecture_re, actionstr)
+        match = re.search(lecture_re, actionstr)
         if not match is None:
             return({'action': 'lecture_view',
-                      'lecture_id': match.groups()[0]})
-        else:
-            if re.search(human_grading_2, actionstr):
-                return({'action': 'human_grading/'})
-            else:
-                print("Uncaught numeric action: ", actionstr)
+                    'lecture_id': match.groups()[0]})
 
-    else:
-        action = {'action': actionstr}
+
+    action = {'action': actionstr}
+
+    if "human_grading" in action['action']:
+        return({'action': 'human_grading/'})
+
 
     # process any url arguments (?arg=opt)
     if part:
@@ -141,7 +137,7 @@ def storeappend(store, arr):
             a[col] = a[col].apply(clean_number)
             a[col] = a[col].astype(np.float64)
 
-    store.append('db', a)
+    store.append('db', a, index=False)
     del a
 
 
