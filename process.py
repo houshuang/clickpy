@@ -64,13 +64,12 @@ def parse(url, prefix_size):
     actionstr = url[prefix_size:].split("#")[0]
     action = {}
     # first check if any numbers, to skip longer matches
+    # try:
     if re.search(num_re, actionstr):
         # special parsing for human grading actions
         match = re.match(human_grading_re, actionstr)
         if not match is None:
             actionstr = "human_grading/"
-            if match.groups()[0]:
-                actionstr = actionstr + match.groups()[0]
             return({'action': actionstr})
 
         # special parsing for lecture_views, otherwise proceed as normal
@@ -93,6 +92,7 @@ def parse(url, prefix_size):
         action.update(items)
 
     return(action)
+
 
 def get_prefix_size(fname):
     """Reads one line of the file to determine the prefix"""
@@ -203,16 +203,25 @@ def main(config):
             proc_chunk(linearr, p, store)
         del linearr
 
-    print("Storing memoized data")
-    for field, memoizer in memos.items():
-        memoizer.store(store)
 
     store.close()
+    hdf_repack = config.clicklog + '.h5.repacked'
+    if os.path.exists(hdf_repack):
+        os.remove(hdf_repack)
+
+
     print("Finished, now repacking with index")
     store = pd.HDFStore(config.clicklog + ".h5")
     db = store['db']
-    db.to_hdf(config.clicklog + '.h5.repacked','db',mode='w',format='table',index=['timestamp'],
+    db.to_hdf(hdf_repack,'db',mode='w',format='table',index=['timestamp'],
               data_columns=['action', 'username'])
+    store.close()
+
+    store = pd.HDFStore(hdf_repack)
+    print("Storing memoized data")
+    for field, memoizer in memos.items():
+        memoizer.store(store)
+    store.close()
 
     print("\nStatistics, unique values: (fields with M are memoized)")
     for col in db.columns:
