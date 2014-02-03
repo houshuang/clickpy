@@ -18,8 +18,8 @@ class Memo(object):
         self.name = name
 
     def get(self, s):
-        if s is None or s is np.NaN:
-            return(np.NaN)
+        if s is None or pd.isnull(s):
+            return -1
 
         item = self.db.get(s)
         if item:

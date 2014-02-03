@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import ujson
+import argparse
 from collections import Counter, Iterable
 from datetime import datetime
 from functools import partial
@@ -34,7 +35,7 @@ cols = ['action', 'currentTime', 'eventTimestamp', 'forum_id',
 
 def clean_number(nstr):
     try:
-        a = int(notnumber.sub('', nstr))
+        a = float(notnumber.sub('', nstr))
     except:
         a = np.NaN
     return(a)
@@ -126,8 +127,7 @@ def storeappend(store, arr):
     if not arr or arr == []:
         return
 
-    a = list(flatten(arr))
-    a = DataFrame(a, columns=cols)
+    a = DataFrame(arr, columns=cols)
     a = memoize(a)
 
     # there should not be any strings left, but we need to clean the
@@ -135,7 +135,7 @@ def storeappend(store, arr):
     for col in a.columns:
         if a[col].dtype == Npobj:
             a[col] = a[col].apply(clean_number)
-            a[col] = a[col].astype(np.float64)
+        a[col] = a[col].astype(np.float64)
 
     store.append('db', a, index=False)
     del a
@@ -152,54 +152,56 @@ def fix_timestamp(parsestr):
     return(parsestr)
 
 
-def process(prefix_size, linechunk):
-    arr = []
-    for line in linechunk:
-        if not linechunk or linechunk == [] or len(linechunk) == 0:
-            next
-        parsestr = ujson.loads(line)
+def process(prefix_size, line):
+    parsestr = ujson.loads(line)
 
-        if parsestr['key'] == "user.video.lecture.action":
-            parsestr.update(ujson.loads(parsestr["value"]))
+    if parsestr['key'] == "user.video.lecture.action":
+        parsestr.update(ujson.loads(parsestr["value"]))
 
-        urlparse = parse(parsestr['page_url'], prefix_size)
-        parsestr.update(urlparse)
-        parsestr = fix_timestamp(parsestr)
-        arr.append(parsestr)
-    return(arr)
+    urlparse = parse(parsestr['page_url'], prefix_size)
+    parsestr.update(urlparse)
+    parsestr = fix_timestamp(parsestr)
+    return(parsestr)
 
 # 4, 10,000 : 17
 # 8, 10,000 : 17
 # no effect of parallelization? too small chunks? try bigger chunks,
 # or on server...
 
-def main(fname, test):
-    prefix_size = get_prefix_size(fname)
-    procfunc = partial(process, prefix_size)
+def proc_chunk(linearr, p, store):
+    arr = p.map(procfunc, linearr)
+    storeappend(store, arr)
 
-    arr = []
-    hdf = fname+(".h5")
+def main(config):
+    hdf = config.clicklog + (".h5")
+    if os.path.exists(hdf):
+        os.remove(hdf)
 
-    os.remove(hdf)
     store = pd.HDFStore(hdf, "w")
-    p = Pool(4)
-    with open(fname) as f:
-        i = 0
-        while True:
+
+    p = Pool(config.pool_size)
+    chunksize = config.chunk_size
+
+    i = 0
+    arr = []
+    linearr = []
+
+    with open(config.clicklog) as f:
+        for line in f:
             i += 1
-            lines = list(islice(f, 200000))
-            if not lines or lines == []:
-                break
-            linechunks = [list(islice(lines, 50000)),list(islice(lines, 50000)),
-                list(islice(lines, 50000)),list(islice(lines, 50000))]
+            linearr.append(line)
 
-            arr = p.map(procfunc, linechunks)
-            storeappend(store, arr)
+            if i > chunksize:
+                proc_chunk(linearr, p, store)
+                linearr = []
 
-            print(i*200000)
-            arr = []
-            if test:
-                break
+                print(i)
+                i = 0
+
+        # if more lines left, process now
+        if len(linearr) > 0:
+            proc_chunk(linearr, p, store)
+        del linearr
 
     print("Storing memoized data")
     for field, memoizer in memos.items():
@@ -208,14 +210,26 @@ def main(fname, test):
     store.close()
     print("Finished")
 
+
+def parse_args():
+    parser = argparse.ArgumentParser(prog = 'clickpy',
+        description='Process clicklog files')
+    parser.add_argument('--pool-size', '-p', type=int, metavar='n', default=6,
+        help="Size of pool for concurrent processing of lines (default 6)")
+    parser.add_argument('--chunk-size', '-c', type=int, metavar='n', default=200000,
+        help="Chunk of lines distributed amongst pools for each run (default 200,000)")
+    parser.add_argument('--working-dir', '-d', type=str, metavar='x', default='/tmp/clickpy',
+        help="Working workingdirectory, will be deleted on start (default /tmp/clickpy)")
+    parser.add_argument('clicklog',type=str,
+        help="clicklog file")
+
+    return(parser.parse_args())
+
+
 if __name__ == "__main__":
-
+    config = parse_args()
     print("Starting...")
-    if len(sys.argv) > 1:
-        fname = sys.argv[1]
-    if len(sys.argv) > 2:
-        test = True
-    else:
-        test = False
+    prefix_size = get_prefix_size(config.clicklog)
+    procfunc = partial(process, prefix_size)
 
-    main(fname, test)
+    main(config)
