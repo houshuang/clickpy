@@ -208,7 +208,15 @@ def main(config):
         memoizer.store(store)
 
     store.close()
-    print("Finished")
+    print("Finished, now repacking with index")
+    store = pd.HDFStore(config.clicklog + ".h5")
+    db = store['db']
+    db.to_hdf(config.clicklog + '.h5.repacked','db',mode='w',format='table',index=['timestamp'],
+              data_columns=['action', 'username'])
+
+    print("Statistics, unique values:")
+    for col in db.columns:
+        print(col, ": ", len(db[col].unique()))
 
 
 def parse_args():
