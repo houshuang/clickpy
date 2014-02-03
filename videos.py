@@ -27,23 +27,16 @@ u.timestamp = pd.to_datetime(u.timestamp, unit='s')
 u = u.sort(columns = 'timestamp')
 u['duration'] = u.timestamp.diff()
 u.duration = u.duration.shift(-1)
-u['indexcounter'] = Series(list(range(0,len(u.index))))
-print(u[['indexcounter', 'timestamp']])
-print(len(u.timestamp.unique()))
-exit()
-u.reindex(index=['indexcounter'], inplace=True)
-u.reset_index()
-tuples = [tuple(x) for x in u[['timestamp', 'action', 'lecture_id', 'indexcounter']].to_records(index=False)]
-
-video_sections = [list(g) for k,g in itertools.groupby(tuples, lambda x: (x[0], x[1]))]
+u.duration = u.duration/10000000
+tuples = [tuple(x) for x in u[['timestamp', 'action', 'lecture_id']].to_records(index=False)]
+video_sections = [list(g) for k,g in itertools.groupby(tuples, lambda x: (x[1], x[2]))]
 
 u = join_value(u, store, ['action', 'type', 'lecture_id'])
-u.set_index('indexcounter')
+u = u.set_index('timestamp')
 for segment in video_sections:
     rows = []
     for event in segment:
-        rows.append(event[3])
+        rows.append(event[0])
 
-    print(rows)
     r = u.loc[rows]
-    print(r.ix[:,['indexcounter','duration','action_val', 'lecture_id_val', 'type_val']])
+    print(r.ix[:,['duration','action_val', 'lecture_id_val', 'type_val']])
