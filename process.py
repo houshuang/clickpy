@@ -35,7 +35,7 @@ cols = ['action', 'currentTime', 'eventTimestamp', 'forum_id',
 
 def clean_number(nstr):
     try:
-        a = float(notnumber.sub('', nstr))
+        a = int(not_num_re.sub('', nstr))
     except:
         a = np.NaN
     return(a)
@@ -132,6 +132,7 @@ def storeappend(store, arr):
 
     # there should not be any strings left, but we need to clean the
     # numbers and convert to floats
+
     for col in a.columns:
         if a[col].dtype == Npobj:
             a[col] = a[col].apply(clean_number)
@@ -191,12 +192,11 @@ def main(config):
             i += 1
             linearr.append(line)
 
-            if i > chunksize:
+            if i / chunksize == i // chunksize:
                 proc_chunk(linearr, p, store)
                 linearr = []
 
                 print(i)
-                i = 0
 
         # if more lines left, process now
         if len(linearr) > 0:
@@ -214,9 +214,10 @@ def main(config):
     db.to_hdf(config.clicklog + '.h5.repacked','db',mode='w',format='table',index=['timestamp'],
               data_columns=['action', 'username'])
 
-    print("Statistics, unique values:")
+    print("\nStatistics, unique values: (fields with M are memoized)")
     for col in db.columns:
-        print(col, ": ", len(db[col].unique()))
+        memoized = "M" if col in memoizable_fields else ""
+        print(col, memoized, ": ", len(db[col].unique()))
 
 
 def parse_args():
