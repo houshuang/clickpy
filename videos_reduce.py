@@ -1,3 +1,6 @@
+# TODO Fix indexing, differs between video and non video wrt timestamps. Make sure all columns are available.
+# run across all students, time it, on the MRI with tmux
+
 import pandas as pd
 import numpy as np
 from pandas import DataFrame, Series
@@ -39,13 +42,17 @@ def convert_user_events(user):
 		r = u.loc[rows]
 
 		if r.head(1).action.values[0] != lecture_action:
-			reduce_dict = r.reset_index()[['duration', 'action', 'level_0']].to_dict(outtype='records')[0]
-			reduce_dict['timestamp'] = reduce_dict.pop('level_0')
+			reduce_dict = r.reset_index()[['duration', 'action']].to_dict(outtype='records')[0]
 		else:
 			reduce_dict = r.type_val.value_counts().to_dict()
 			duration = r.duration.sum()
-			reduce_dict.update({"duration": duration, "timestamp":pd.to_datetime(r.head(1).index.item()),
+			reduce_dict.update({"duration": duration,
 								"lecture_id": r.head(1).lecture_id.values[0], "action": lecture_action})
+		timestamp = pd.to_datetime(r.head(1).index.item())
+		reduce_dict.update({"timestamp": timestamp})
+
 		video_events.append(reduce_dict)
 
-	return(DataFrame(video_events))
+	return(DataFrame(video_events, columns=['action', 'duration', 'lecture_id', 'pause', 'play', 'ratechange', 'seeked', 'stalled', 'timestamp']))
+
+print(convert_user_events(127))
