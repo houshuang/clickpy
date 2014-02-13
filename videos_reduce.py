@@ -5,11 +5,26 @@ import pandas as pd
 import numpy as np
 from pandas import DataFrame, Series
 import itertools
+import sys
+import os
+import pickle
 import pprint
+from uuid import uuid4
 pp = pprint.PrettyPrinter(indent=2).pprint
 
-store = pd.HDFStore("mentalhealth_002.h5.repacked")
-lecture_action = store['action']['lecture/view']
+def dump(arr, tmpdir):
+    """Pickle's the array, and stores it in tmpdir. Uses rename to
+    ensure writes are atomic
+    """
+
+    idstr = str(uuid4())
+
+    with open(os.path.join(tmpdir, "sub", idstr), "wb") as dumpf:
+        pickle.dump(arr, dumpf)
+    os.rename(os.path.join(tmpdir, "sub", idstr),
+        os.path.join(tmpdir, idstr))
+
+    print("*** Dumping to %s" % idstr)
 
 def join_value(frame, store, values):
 	for val in values:
@@ -55,8 +70,29 @@ def convert_user_events(user):
 
 	return(DataFrame(video_events, columns=['action', 'duration', 'lecture_id', 'pause', 'play', 'ratechange', 'seeked', 'stalled', 'timestamp']))
 
-arr = []
-for user in range(1,20):
-	arr.append(convert_user_events(user))
+#**************************************************
+argv = sys.argv
+if len(argv) < 5:
+	print("Usage: store.h5 range-start range-end working-dir")
+	exit()
 
-print(pd.concat(arr))
+store = pd.HDFStore(argv[1])
+lecture_action = store['action']['lecture/view']
+
+ids = range(int(argv[2]), int(argv[3]))
+working_dir = argv[4]
+
+event_arr = []
+
+i = 0
+
+for username in ids:
+	i += 1
+	events = convert_user_events(username)
+	event_arr.append(events)
+	if i > 10:
+		i = 0
+		dump(pd.concat(event_arr), working_dir)
+
+if i > 0:
+	dump(pd.concat(event_arr), working_dir)

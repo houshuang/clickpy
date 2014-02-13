@@ -7,6 +7,10 @@ from pandas import DataFrame
 import pandas as pd
 import numpy as np
 
+if len(sys.argv) < 3:
+	print("Usage: tmpdir storepath")
+	exit()
+
 tmpdir = sys.argv[1]
 storepath = sys.argv[2]
 if os.path.exists(storepath):
