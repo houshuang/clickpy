@@ -55,4 +55,8 @@ def convert_user_events(user):
 
 	return(DataFrame(video_events, columns=['action', 'duration', 'lecture_id', 'pause', 'play', 'ratechange', 'seeked', 'stalled', 'timestamp']))
 
-print(convert_user_events(127))
+arr = []
+for user in range(1,20):
+	arr.append(convert_user_events(user))
+
+print(pd.concat(arr))
