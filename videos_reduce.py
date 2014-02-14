@@ -67,7 +67,7 @@ def convert_user_events(user):
 			reduce_dict.update({"duration": duration,
 								"lecture_id": r.head(1).lecture_id.values[0], "action": lecture_action})
 		timestamp = pd.to_datetime(r.head(1).index.item())
-		reduce_dict.update({"timestamp": timestamp})
+		reduce_dict.update({"timestamp": timestamp, "username": user})
 
 		video_events.append(reduce_dict)
 
@@ -106,6 +106,7 @@ while c < store_length + 1:
 	if i > 10:
 		i = 0
 		dump(pd.concat(event_arr), working_dir)
+		event_arr = []
 	c += range_jump
 
 if i > 0:
