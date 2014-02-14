@@ -71,7 +71,7 @@ def convert_user_events(user):
 
 		video_events.append(reduce_dict)
 
-	return(DataFrame(video_events, columns=['action', 'duration', 'lecture_id', 'pause', 'play', 'ratechange', 'seeked', 'stalled', 'timestamp']))
+	return(DataFrame(video_events, columns=['action', 'duration', 'lecture_id', 'pause', 'play', 'ratechange', 'seeked', 'stalled', 'timestamp', 'username']))
 
 #**************************************************
 argv = sys.argv
