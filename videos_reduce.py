@@ -38,6 +38,9 @@ def join_value(frame, store, values):
 def convert_user_events(user):
 	u = store.select('db', pd.Term('username = %s' % user))
 
+	if len(u) == 0:
+		return(None)
+	print(len(u))
 	u = u.reset_index()
 	u.timestamp = pd.to_datetime(u.timestamp, unit='s')
 	u = u.sort(columns = 'timestamp')
@@ -73,26 +76,37 @@ def convert_user_events(user):
 #**************************************************
 argv = sys.argv
 if len(argv) < 5:
-	print("Usage: store.h5 range-start range-end working-dir")
+	print("Usage: store.h5 range-start range-jump working-dir")
 	exit()
 
 store = pd.HDFStore(argv[1])
+store_length = store['db'].username.max()
 lecture_action = store['action']['lecture/view']
 
-ids = range(int(argv[2]), int(argv[3]))
+range_start = int(argv[2])
+range_jump = int(argv[3])
 working_dir = argv[4]
 
 event_arr = []
 
 i = 0
+cnt = 0
+c = range_start
 
-for username in ids:
+while c < store_length + 1:
 	i += 1
-	events = convert_user_events(username)
-	event_arr.append(events)
+	cnt += 1
+
+	print("%d (%d): Processing user %d: " % (i, cnt, c))
+	events = convert_user_events(c)
+	if not events is None:
+		event_arr.append(events)
+	else:
+		print("None")
 	if i > 10:
 		i = 0
 		dump(pd.concat(event_arr), working_dir)
+	c += range_jump
 
 if i > 0:
 	dump(pd.concat(event_arr), working_dir)
