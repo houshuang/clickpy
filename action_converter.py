@@ -16,9 +16,8 @@ class LectureView:
 	def __init__(self):
 		self.seen = []
 
-	def proc(self, lec):
-		l = lec #row['lecture_id'][0]
-		print(l,type(l))
+	def proc(self, row):
+		l = row['lecture_id']
 		if self.seen == []:
 			self.seen.append(l)
 			return '' # no tag
@@ -35,8 +34,6 @@ class LectureView:
 		return 'out-of-sequence'
 
 def dispatch(vals):
-	#handlers = {'lecture/view': LectureView}
-	#handlers = {k:handler() for k,v in handlers.items()} # initialize handlers
 	proc = LectureView()
 	return [proc.proc(v) for v in vals]
 	if action in handlers.keys():
@@ -59,10 +56,13 @@ class ActionConverter(object):
 		self.store = store
 		self.store_length = store['db'].username.max()
 		self.lecture_action = store['action']['lecture/view']
+		self.handlers = {'lecture/view': LectureView}
 
 	def convert(self, user):
 		store = self.store
 		u = store.select('db', pd.Term('username = %s' % user))
+
+		handlers = {k:v() for k,v in self.handlers.items()} # initialize handlers
 
 		# checking if there are any events
 		if len(u) == 0:
@@ -80,10 +80,13 @@ class ActionConverter(object):
 		video_sections = [list(g) for k,g in itertools.
 						  groupby(tuples, lambda x: (x[1], x[2]))]
 
-		u = join_value(u, store, ['type'])
+		u = join_value(u, store, ['type', 'action'])
 		video_events = []
 		u = u.set_index('timestamp')
 		for segment in video_sections:
+			# **************************************************
+			# first, reduce multi-line video events to one line and pass through other events
+			# into a dict, which we can further process
 			rows = []
 			for event in segment:
 				rows.append(event[0])
@@ -92,23 +95,26 @@ class ActionConverter(object):
 
 			# if not a video event, just write it in
 			if r.head(1).action.values[0] != self.lecture_action:
-				reduce_dict = r.reset_index()[['duration', 'action']].\
-					to_dict(outtype='records')[0]
+				reduce_dict = r.reset_index().to_dict(outtype='records')[0]
 
 			# if a video event, reduce down to one line
 			else:
 				reduce_dict = r.type_val.value_counts().to_dict()
 				duration = r.duration.sum()
+				timestamp = pd.to_datetime(r.head(1).index.item())
+				action_val = r.head(1).action_val.values[0]
 				reduce_dict.update({"duration": duration,
 									"lecture_id": r.head(1).lecture_id.values[0],
-									"action": self.lecture_action})
-			timestamp = pd.to_datetime(r.head(1).index.item())
-			reduce_dict.update({"timestamp": timestamp, "username": user})
+									"action": self.lecture_action,
+									"username": user,
+									"timestamp": timestamp,
+									"action_val": action_val})
 
+			# ************************************************
+			# parse video events depending on action_type, and add tags
+			if reduce_dict['action_val'] in handlers.keys():
+				reduce_dict['tag'] = handlers[reduce_dict['action_val']].proc(reduce_dict)
 			video_events.append(reduce_dict)
 
 		db = DataFrame(video_events)
-
-		db.ix[db.action == self.lecture_action, 'video_tag'] = dispatch(db.lecture_id)
-
-		return db
+		return (db)
