@@ -3,7 +3,6 @@ import numpy as np
 from pandas import DataFrame, Series
 import itertools
 
-
 # iterate through events, keeping track of previously seen
 # For videos, we need to tag
 # 1) if they are being viewed out of the intended order,
@@ -16,7 +15,7 @@ class LectureView:
 	def __init__(self):
 		self.seen = []
 
-	def proc(self, row):
+	def proc_sequence(self, row):
 		l = row['lecture_id']
 		if self.seen == []:
 			self.seen.append(l)
@@ -32,6 +31,13 @@ class LectureView:
 		# end of the list, if it hasn't been caught already, should mean out-of-sequence
 		self.seen.append(l)
 		return 'out-of-sequence'
+
+	def proc(self, row):
+		tags = [self.proc_sequence(row)]
+		for x in ['seeked', 'pause', 'ratechange']:
+			if x in row:
+				tags.append(x)
+		return tags
 
 def dispatch(vals):
 	proc = LectureView()
@@ -112,8 +118,13 @@ class ActionConverter(object):
 
 			# ************************************************
 			# parse video events depending on action_type, and add tags
+			tags = []
 			if reduce_dict['action_val'] in handlers.keys():
-				reduce_dict['tag'] = handlers[reduce_dict['action_val']].proc(reduce_dict)
+				tags = handlers[reduce_dict['action_val']].proc(reduce_dict)
+			if reduce_dict['duration'] < 30000000000:
+				tags.append('short-event')
+
+			reduce_dict["tags"] = ", ".join(tags)
 			video_events.append(reduce_dict)
 
 		db = DataFrame(video_events)
