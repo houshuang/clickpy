@@ -214,7 +214,7 @@ def main(config):
     store = pd.HDFStore(config.clicklog + ".h5")
     db = store['db']
     db.to_hdf(hdf_repack,'db',mode='w',format='table',index=['timestamp'],
-              data_columns=['action', 'username'])
+              data_columns=['action', 'username', 'timestamp'])
     store.close()
 
     store = pd.HDFStore(hdf_repack)

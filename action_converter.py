@@ -57,6 +57,10 @@ def join_value(frame, store, values):
 		frame = frame.reset_index()
 	return(frame)
 
+def get_index_by_value(pdseries, value):
+	"Looks up Pandas.Series index by value"
+	return(pdseries[pdseries == value].index[0])
+
 class ActionConverter(object):
 	def __init__(self, store):
 		self.store = store
@@ -64,9 +68,13 @@ class ActionConverter(object):
 		self.lecture_action = store['action']['lecture/view']
 		self.handlers = {'lecture/view': LectureView}
 
-	def convert(self, user):
+	def convert(self, user, max_time = None):
 		store = self.store
-		u = store.select('db', pd.Term('username = %s' % user))
+		term = "username = %s" % user
+		if max_time:
+			term += " & timestamp < %d" % max_time
+		u = store.select('db', pd.Term(term))
+		username = get_index_by_value(self.store['username'], user)
 
 		handlers = {k:v() for k,v in self.handlers.items()} # initialize handlers
 
@@ -75,7 +83,7 @@ class ActionConverter(object):
 			return(None)
 		print(len(u))
 
-		# cleaning up and organizing in groups to parse videos
+
 		u = u.reset_index()
 		u.timestamp = pd.to_datetime(u.timestamp, unit='s')
 		u = u.sort(columns = 'timestamp')
@@ -123,9 +131,22 @@ class ActionConverter(object):
 				tags = handlers[reduce_dict['action_val']].proc(reduce_dict)
 			if reduce_dict['duration'] < 30000000000:
 				tags.append('short-event')
+			reduce_dict['tags'] = tags
 
-			reduce_dict["tags"] = ", ".join(tags)
 			video_events.append(reduce_dict)
 
-		db = DataFrame(video_events)
-		return (db)
+		# **************************************************
+		# Formatting for arules-sequence
+
+		txt = ''
+		for event in video_events:
+			tagcnt = 1
+			if 'tags' in event:
+				tagcnt += len(event['tags'])
+				tags = ' '.join(event['tags'])
+			else:
+				tags = ''
+			line = "%s %s %d %s %s" % (username, event['timestamp'].timestamp(), tagcnt, event['action_val'], tags)
+			txt += line + "\n"
+
+		return (txt)

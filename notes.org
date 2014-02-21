@@ -1,0 +1,14 @@
+TODOs:
+
+* TODO find end-date of mentalhealth_002 and filter import
+* TODO run across all users and dump csvs
+* TODO combine csv files
+* DONE generate desired output format for Chris
+  CLOSED: [2014-02-21 Fri 16:19]
+  - student001 time001 4  lecture/view out-of-sequence seeked pause (4 is number of events coming after)
+
+
+* Org-mode notes
+- S-left,right trigger kind of list, headline todo states, - different list items
+- S-up/down priority (only on headline items)
+- tab, toggle visibility
