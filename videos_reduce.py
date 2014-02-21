@@ -16,16 +16,16 @@ from action_converter import ActionConverter
 
 
 def dump(arr, tmpdir):
-    """Dumps lines to a text file in tmp dir"""
+	"""Dumps lines to a text file in tmp dir"""
 
-    idstr = str(uuid4())
+	idstr = str(uuid4())
 
-    with open(os.path.join(tmpdir, "sub", idstr), "wb") as dumpf:
-		open.write('\n'.join(arr))
-    os.rename(os.path.join(tmpdir, "sub", idstr),
-        os.path.join(tmpdir, idstr))
+	with open(os.path.join(tmpdir, "sub", idstr), "wb") as dumpf:
+		dumpf.write('\n'.join(arr))
+		os.rename(os.path.join(tmpdir, "sub", idstr),
+				  os.path.join(tmpdir, idstr))
 
-    print("*** Dumping to %s" % idstr)
+	print("*** Dumping to %s" % idstr)
 
 #**************************************************
 argv = sys.argv
@@ -55,11 +55,11 @@ while c < store_length + 1:
 		event_arr.append(events)
 	else:
 		print("None")
-	if i > 10:
-		i = 0
-		dump(event_arr, working_dir)
-		event_arr = []
-	c += range_jump
+		if i > 10:
+			i = 0
+			dump(event_arr, working_dir)
+			event_arr = []
+			c += range_jump
 
 if i > 0:
 	dump(event_arr, working_dir)
