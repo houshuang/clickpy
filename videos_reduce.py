@@ -12,18 +12,16 @@ import pprint
 from uuid import uuid4
 pp = pprint.PrettyPrinter(indent=2).pprint
 
-import action_converter
+from action_converter import ActionConverter
 
 
 def dump(arr, tmpdir):
-    """Pickles the array, and stores it in tmpdir. Uses rename to
-    ensure writes are atomic
-    """
+    """Dumps lines to a text file in tmp dir"""
 
     idstr = str(uuid4())
 
     with open(os.path.join(tmpdir, "sub", idstr), "wb") as dumpf:
-        pickle.dump(arr, dumpf)
+		open.write('\n'.join(arr))
     os.rename(os.path.join(tmpdir, "sub", idstr),
         os.path.join(tmpdir, idstr))
 
@@ -35,7 +33,7 @@ if len(argv) < 5:
 	print("Usage: store.h5 range-start range-jump working-dir")
 	exit()
 
-converter = action_converter(store)
+converter = ActionConverter(store)
 
 range_start = int(argv[2])
 range_jump = int(argv[3])
@@ -59,9 +57,9 @@ while c < store_length + 1:
 		print("None")
 	if i > 10:
 		i = 0
-		dump(pd.concat(event_arr), working_dir)
+		dump(event_arr, working_dir)
 		event_arr = []
 	c += range_jump
 
 if i > 0:
-	dump(pd.concat(event_arr), working_dir)
+	dump(event_arr, working_dir)
