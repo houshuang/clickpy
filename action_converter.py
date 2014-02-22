@@ -34,7 +34,7 @@ class LectureView:
 
 	def proc(self, row):
 		seq = self.proc_sequence(row)
-		tags = [,],
+		tags = []
 		if seq:
 			tags.append(seq)
 		for x in ['seeked', 'pause', 'ratechange']:
