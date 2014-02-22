@@ -1,6 +1,16 @@
 TODOs:
 
+* TODO check complaing about end-date by Jen
+- programming1_002 end-date is Nov 3
+- programming1_001 end-date is Aug 1??
+
+* User issues
+- failure with user 19893 on line 30 in introstats_001 survey FF7EBBF6B74DC033D9
+
+
 * TODO find end-date of mentalhealth_002 and filter import
+- 1376524800 is 15/8/2013 00:00
+
 * TODO run across all users and dump csvs
 * TODO combine csv files
 * DONE generate desired output format for Chris
@@ -12,3 +22,4 @@ TODOs:
 - S-left,right trigger kind of list, headline todo states, - different list items
 - S-up/down priority (only on headline items)
 - tab, toggle visibility
+- M-enter insert headline above

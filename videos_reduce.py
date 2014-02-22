@@ -21,7 +21,7 @@ def dump(arr, tmpdir):
 	idstr = str(uuid4())
 
 	with open(os.path.join(tmpdir, "sub", idstr), "wb") as dumpf:
-		dumpf.write('\n'.join(arr))
+		dumpf.write(''.join(arr))
 		os.rename(os.path.join(tmpdir, "sub", idstr),
 				  os.path.join(tmpdir, idstr))
 
@@ -33,12 +33,13 @@ if len(argv) < 5:
 	print("Usage: store.h5 range-start range-jump working-dir")
 	exit()
 
+store = pd.HDFStore(argv[1])
 converter = ActionConverter(store)
-
+store_length = store['db'].username.max()
 range_start = int(argv[2])
 range_jump = int(argv[3])
 working_dir = argv[4]
-
+print(store_length)
 event_arr = []
 
 i = 0
@@ -55,11 +56,11 @@ while c < store_length + 1:
 		event_arr.append(events)
 	else:
 		print("None")
-		if i > 10:
-			i = 0
-			dump(event_arr, working_dir)
-			event_arr = []
-			c += range_jump
+	if i > 10:
+		i = 0
+		dump(event_arr, working_dir)
+		event_arr = []
+	c += range_jump
 
 if i > 0:
 	dump(event_arr, working_dir)

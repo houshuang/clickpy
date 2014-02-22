@@ -81,11 +81,8 @@ class ActionConverter(object):
 		# checking if there are any events
 		if len(u) == 0:
 			return(None)
-		print(len(u))
-
 
 		u = u.reset_index()
-		u.timestamp = pd.to_datetime(u.timestamp, unit='s')
 		u = u.sort(columns = 'timestamp')
 		u['duration'] = u.timestamp.diff()
 		u.duration = u.duration.shift(-1)
@@ -115,7 +112,7 @@ class ActionConverter(object):
 			else:
 				reduce_dict = r.type_val.value_counts().to_dict()
 				duration = r.duration.sum()
-				timestamp = pd.to_datetime(r.head(1).index.item())
+				timestamp = r.head(1).index.item()
 				action_val = r.head(1).action_val.values[0]
 				reduce_dict.update({"duration": duration,
 									"lecture_id": r.head(1).lecture_id.values[0],
@@ -129,7 +126,7 @@ class ActionConverter(object):
 			tags = []
 			if reduce_dict['action_val'] in handlers.keys():
 				tags = handlers[reduce_dict['action_val']].proc(reduce_dict)
-			if reduce_dict['duration'] < 30000000000:
+			if reduce_dict['duration'] < 3:
 				tags.append('short-event')
 			reduce_dict['tags'] = tags
 
@@ -146,7 +143,7 @@ class ActionConverter(object):
 				tags = ' '.join(event['tags'])
 			else:
 				tags = ''
-			line = "%s %s %d %s %s" % (username, event['timestamp'].timestamp(), tagcnt, event['action_val'], tags)
+			line = "%s %s %d %s %s" % (username, event['timestamp'], tagcnt, event['action_val'], tags)
 			txt += line + "\n"
 
 		return (txt)
