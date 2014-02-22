@@ -19,7 +19,7 @@ class LectureView:
 		l = row['lecture_id']
 		if self.seen == []:
 			self.seen.append(l)
-			return '' # no tag
+			return None # no tag
 		if l == self.seen[-1]:
 			return 'immediate-review'
 		if l in self.seen:
@@ -33,7 +33,10 @@ class LectureView:
 		return 'out-of-sequence'
 
 	def proc(self, row):
-		tags = [self.proc_sequence(row)]
+		seq = self.proc_sequence(row)
+		tags = [,],
+		if seq:
+			tags.append(seq)
 		for x in ['seeked', 'pause', 'ratechange']:
 			if x in row:
 				tags.append(x)
