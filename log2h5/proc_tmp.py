@@ -10,6 +10,7 @@ import redis
 from distutils.util import strtobool
 from subprocess import call, Popen
 import shutil
+import memo
 
 def ok_delete_p(question):
 	return strtobool(input(question).lower())
@@ -37,12 +38,18 @@ if len(sys.argv) < 5:
 	print("Usage: log-file hdf-file tmp-dir num-processes prefix")
 	exit()
 
+python_exec = sys.executable
+script_path = os.path.realpath(__file__)
 logfile = sys.argv[1]
 hdffile = sys.argv[2]
 tmpdir = sys.argv[3]
 dumpdir = sys.argv[3]+"/dump"
 numprocesses = int(sys.argv[4])
 prefix = sys.argv[5]
+
+memoizable_fields = ['action', 'page', 'type', 'visiting',
+						  'key', 'session', 'username']
+memos = {key:memo.Memo(key, prefix) for key in memoizable_fields}
 
 # make sure that paths are ready
 ensure_empty(tmpdir)
@@ -60,13 +67,13 @@ if r.exists(prefix + ":finished"):
 		exit()
 
 print("Splitting log file into %s" % tmpdir)
-call(['split', '-l 20', logfile], cwd=tmpdir)
+call(['split', '-l 200000', os.path.join(script_path, logfile)], cwd=tmpdir)
 store = pd.HDFStore(hdffile, "w")
 
 print("Spawning %d processing scripts" % numprocesses)
 procs = []
 for proc in range(0, numprocesses):
-	procs.append(Popen(["/Users/Stian/.py3/bin/python", "process.py", tmpdir, prefix]))
+	procs.append(Popen([python_exec, "process.py", tmpdir, prefix]))
 
 while True:
 	t = perf_counter()
@@ -83,9 +90,16 @@ while True:
 	arr = pickle.load(open(fname, "rb"))
 	print(">>> Opening %s, %d units" % (a[0], len(arr)))
 
-	store.append('db-video-proc', arr)
+	store.append('', arr)
 	os.remove(fname)
 	print(">>> %s: %f" % (a[0], perf_counter()-t))
 
+print("Processing finished, memoizing data")
+for field, memoizer in memos.items():
+	store[field] = memoizer.to_series()
+
 store.close()
+shutil.rmtree(tmpdir)
+r.delete(r.keys(prefix+":*"))
+
 print("### Finished")
