@@ -11,6 +11,7 @@ from functools import partial
 from itertools import islice
 from multiprocessing import Pool
 from urllib.parse import parse_qs
+import time
 
 from pandas import DataFrame, Series
 import pandas as pd
@@ -126,11 +127,10 @@ class Process(object):
 
 	def memoize(self, df):
 		"""Runs through list of fields to memoize, and returns
-		new dataframe with all fields memoized"""
+		ew dataframe with all fields memoized"""
 		for field, memoizer in self.memos.items():
 			if field in df.columns:
 				df[field] = df[field].apply(memoizer.get)
-				print("memoizing %s" % field)
 		return df
 
 
@@ -145,7 +145,7 @@ class Process(object):
 	def dump(self, arr):
 		"""Dumps lines to a text file in tmp dir"""
 
-		idstr = str(uuid4())
+		idstr = str(uuid4()) + "=" + str(self.pid)
 		tmpname = os.path.join(self.tmpdir, "sub", idstr)
 		dumpname = os.path.join(self.tmpdir, "dump", idstr)
 		with open(tmpname, "wb") as dumpf:
@@ -200,7 +200,11 @@ class Process(object):
 			files = os.listdir(self.tmpdir)
 			a = [f for f in files if os.path.isfile(os.path.join(self.tmpdir, f))]
 			if a == []:
-				break # done processing
+				if self.r.get(self.prefix+":split-finished") == "0":
+					time.sleep(5)
+					continue
+				else:
+					break # done processing
 
 			nextfile = a[0]
 			fname = os.path.join(self.tmpdir, nextfile) # grab the first file we see

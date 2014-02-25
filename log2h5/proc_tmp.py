@@ -1,7 +1,7 @@
 """Log2h5
 
 Usage:
-  log2hf.py <log-file> <hdf-file> [--tmpdir DIR] [--procs N] [--redis-prefix PREFIX] [--line-chunks CHUNKS]
+  log2hf.py <log-file> <hdf-file> [--tmpdir DIR] [--procs N] [--redis-prefix PREFIX] [--line-chunks CHUNKS] [--force]
 
 Arguments:
   <log-file>: Coursera log file
@@ -12,6 +12,7 @@ Options:
 --procs	N                Processors to use [default: 8]
 --redis-prefix PREFIX    Redis-prefix to use, if running other programs simultaneously [default: log2hf]
 --line-chunks CHUNKS     Line chunks to split log file [default: 2000000]
+--force                  Force overwriting all (hdf5, tempdir and redis-keys)
 """
 
 from docopt import docopt
@@ -32,9 +33,9 @@ import memo
 def ok_delete_p(question):
 	return strtobool(input(question).lower())
 
-def ensure_empty(f):
+def ensure_empty(f, force):
 	if os.path.exists(f):
-		if(ok_delete_p("%s exists, OK to delete?" % f)):
+		if force or ok_delete_p("%s exists, OK to delete?" % f):
 			if os.path.isdir(f):
 				shutil.rmtree(f)
 			else:
@@ -53,7 +54,7 @@ def all_procs_finished(procs):
 
 arguments = docopt(__doc__)
 python_exec = sys.executable
-script_path = os.path.realpath(__file__)
+script_path = os.path.dirname(os.path.realpath(__file__))
 logfile = arguments['<log-file>']
 hdffile = arguments['<hdf-file>']
 tmpdir = arguments['--tmpdir']
@@ -61,14 +62,15 @@ dumpdir = tmpdir + "/dump"
 numprocesses = int(arguments['--procs'])
 prefix = arguments['--redis-prefix']
 splitlines = arguments['--line-chunks']
+force = arguments['--force']
 
 memoizable_fields = ['action', 'page', 'type', 'visiting',
 						  'key', 'session', 'username']
 memos = {key:memo.Memo(key, prefix) for key in memoizable_fields}
 
 # make sure that paths are ready
-ensure_empty(tmpdir)
-ensure_empty(hdffile)
+ensure_empty(tmpdir, force)
+ensure_empty(hdffile, force)
 os.mkdir(tmpdir)
 os.mkdir(tmpdir + "/sub")
 os.mkdir(dumpdir)
@@ -76,13 +78,16 @@ os.mkdir(dumpdir)
 # make sure that Redis keyspace is empty
 r = redis.StrictRedis(host='localhost', decode_responses=True)
 if r.exists(prefix + ":finished"):
-	if(ok_delete_p("Keys with prefix %s exist, delete all?" % prefix)):
+	if force or ok_delete_p("Keys with prefix %s exist, delete all?" % prefix):
 		r.delete(r.keys(prefix+":*"))
 	else:
 		exit()
 
 print("Splitting log file into %s" % tmpdir)
-call(['split', '-l 200000', os.path.join(script_path, logfile)], cwd=tmpdir)
+r.set(prefix + ":split-finished", "0")
+splitfinished = False
+
+split = Popen(['split', '-l %s' % splitlines, os.path.join(script_path, logfile)], cwd=tmpdir)
 store = pd.HDFStore(hdffile, "w")
 
 print("Spawning %d processing scripts" % numprocesses)
@@ -92,20 +97,25 @@ for proc in range(0, numprocesses):
 
 while True:
 	t = perf_counter()
-	print("Checking if any files")
+
+	if (not splitfinished) and split.poll() is not None:
+		print("Splitting finished, sending signal")
+		r.set(prefix + ":split-finished", "1")
+		splitfinished = True
+
 	files = os.listdir(dumpdir)
 	a = [f for f in files if os.path.isfile(os.path.join(dumpdir,f))]
 	if a == []:
 		if all_procs_finished(procs):
 			break
-		time.sleep(1)
+		time.sleep(2)
 		continue
 
 	fname = os.path.join(dumpdir, a[0])
 	arr = pickle.load(open(fname, "rb"))
 	print(">>> Opening %s, %d units" % (a[0], len(arr)))
 
-	store.append('', arr)
+	store.append('db', arr)
 	os.remove(fname)
 	print(">>> %s: %f" % (a[0], perf_counter()-t))
 
