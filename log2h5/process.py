@@ -12,6 +12,7 @@ from itertools import islice
 from multiprocessing import Pool
 from urllib.parse import parse_qs
 import time
+from time import perf_counter
 
 from pandas import DataFrame, Series
 import pandas as pd
@@ -216,6 +217,7 @@ class Process(object):
 				continue # someone else grabbed the file, try again
 
 			print(">>> %d: Opening %s" % (self.pid, nextfile))
+			t = perf_counter()
 
 			if not self.prefix_size:
 				self.prefix_size = self.get_prefix_size(fname_sub)
@@ -230,7 +232,7 @@ class Process(object):
 
 			self.storeappend(proclines)
 			os.remove(fname_sub)
-			print(">>> %d: Done with %s" % (self.pid, nextfile))
+			print(">>> %d: Done with %s (%f)" % (self.pid, nextfile, perf_counter()-t))
 
 		# no more files, send sentinel and wrap up
 		self.r.rpush('%s:finished' % (self.prefix) , self.pid)
