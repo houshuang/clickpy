@@ -23,10 +23,10 @@ import memo
 class Logger(object):
 	def __init__(self, r, prefix):
 		self.r = r
-		self.log = '%s:log' % prefix
+		self.logstore = '%s:log' % prefix
 
 	def log(self, text):
-		self.r.rpush(self.log, text)
+		self.r.rpush(self.logstore, text)
 
 class Process(object):
 	def get_prefix_size(self, fname):
@@ -70,7 +70,7 @@ class Process(object):
 
 		self.pid = os.getpid()
 		self.r = redis.StrictRedis(host='localhost', decode_responses=True)
-		logger = Logger(self.r, self.prefix)
+		self.logger = Logger(self.r, self.prefix)
 		self.npobj = np.dtype('O')
 
 	def clean_number(self, nstr):
@@ -225,10 +225,10 @@ class Process(object):
 			proclines = []
 			with open(fname_sub) as f:
 				for line in f:
-					#try:
+					try:
 						proclines.append(self.process(line))
-					#except:
-					#	self.logger.log("Failed parse: %s" % line)
+					except:
+						self.logger.log("Failed parse: %s" % line)
 
 			self.storeappend(proclines)
 			os.remove(fname_sub)

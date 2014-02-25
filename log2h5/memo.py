@@ -28,7 +28,7 @@ class Memo(object):
 		self.r.zadd(self.store, c, obj)
 		return c
 
-	@lru_cache(maxsize=None)
+	@lru_cache(maxsize=256)
 	def get(self, s):
 		if s is None or pd.isnull(s):
 			return -1
