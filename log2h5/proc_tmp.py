@@ -35,7 +35,7 @@ def all_procs_finished(procs):
 	return True
 
 if len(sys.argv) < 5:
-	print("Usage: log-file hdf-file tmp-dir num-processes prefix")
+	print("Usage: log-file hdf-file tmp-dir num-processes redis-prefix")
 	exit()
 
 python_exec = sys.executable
