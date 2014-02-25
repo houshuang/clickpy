@@ -1,3 +1,20 @@
+"""Log2h5
+
+Usage:
+  log2hf.py <log-file> <hdf-file> [--tmpdir DIR] [--procs N] [--redis-prefix PREFIX] [--line-chunks CHUNKS]
+
+Arguments:
+  <log-file>: Coursera log file
+  <hdf-file>: Resulting hdf file, path must exist
+
+Options:
+--tmpdir DIR             Intermediate storage, default /tmp/clickpy, will be cleaned out [default: /tmp/clickpy]
+--procs	N                Processors to use [default: 8]
+--redis-prefix PREFIX    Redis-prefix to use, if running other programs simultaneously [default: log2hf]
+--line-chunks CHUNKS     Line chunks to split log file [default: 2000000]
+"""
+
+from docopt import docopt
 from time import perf_counter
 import os
 import time
@@ -34,18 +51,16 @@ def all_procs_finished(procs):
 			return False
 	return True
 
-if len(sys.argv) < 5:
-	print("Usage: log-file hdf-file tmp-dir num-processes redis-prefix")
-	exit()
-
+arguments = docopt(__doc__)
 python_exec = sys.executable
 script_path = os.path.realpath(__file__)
-logfile = sys.argv[1]
-hdffile = sys.argv[2]
-tmpdir = sys.argv[3]
-dumpdir = sys.argv[3]+"/dump"
-numprocesses = int(sys.argv[4])
-prefix = sys.argv[5]
+logfile = arguments['<log-file>']
+hdffile = arguments['<hdf-file>']
+tmpdir = arguments['--tmpdir']
+dumpdir = tmpdir + "/dump"
+numprocesses = int(arguments['--procs'])
+prefix = arguments['--redis-prefix']
+splitlines = arguments['--line-chunks']
 
 memoizable_fields = ['action', 'page', 'type', 'visiting',
 						  'key', 'session', 'username']
