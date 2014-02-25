@@ -87,7 +87,7 @@ print("Splitting log file into %s" % tmpdir)
 r.set(prefix + ":split-finished", "0")
 splitfinished = False
 
-split = Popen(['split', '-l %s' % splitlines, os.path.join(script_path, logfile)], cwd=tmpdir)
+split = Popen(['split', '-a 5', '-l %s' % splitlines, os.path.join(script_path, logfile)], cwd=tmpdir)
 store = pd.HDFStore(hdffile, "w")
 
 print("Spawning %d processing scripts" % numprocesses)
