@@ -67,7 +67,6 @@ def get_index_by_value(pdseries, value):
 class ActionConverter(object):
 	def __init__(self, store):
 		self.store = store
-		self.store_length = store['db'].username.max()
 		self.lecture_action = store['action']['lecture/view']
 		self.handlers = {'lecture/view': LectureView}
 
@@ -75,7 +74,7 @@ class ActionConverter(object):
 		store = self.store
 		term = "username = %s" % user
 		if max_time:
-			term += " & timestamp < %d" % max_time
+			term += " & index < %d" % max_time
 		u = store.select('db', pd.Term(term))
 		username = get_index_by_value(self.store['username'], user)
 

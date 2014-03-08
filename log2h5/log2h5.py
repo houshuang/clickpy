@@ -57,6 +57,7 @@ python_exec = sys.executable
 script_path = os.path.dirname(os.path.realpath(__file__))
 logfile = arguments['<log-file>']
 hdffile = arguments['<hdf-file>']
+hdffiletmp = hdffile + ".tmp"
 tmpdir = arguments['--tmpdir']
 dumpdir = tmpdir + "/dump"
 numprocesses = int(arguments['--procs'])
@@ -71,6 +72,7 @@ memos = {key:memo.Memo(key, prefix) for key in memoizable_fields}
 # make sure that paths are ready
 ensure_empty(tmpdir, force)
 ensure_empty(hdffile, force)
+ensure_empty(hdffiletmp, force)
 os.mkdir(tmpdir)
 os.mkdir(tmpdir + "/sub")
 os.mkdir(dumpdir)
@@ -79,7 +81,7 @@ os.mkdir(dumpdir)
 r = redis.StrictRedis(host='localhost', decode_responses=True)
 if r.exists(prefix + ":finished"):
 	if force or ok_delete_p("Keys with prefix %s exist, delete all?" % prefix):
-		r.delete(r.keys(prefix+":*"))
+		r.flushdb()
 	else:
 		exit()
 
@@ -88,7 +90,7 @@ r.set(prefix + ":split-finished", "0")
 splitfinished = False
 
 split = Popen(['split', '-a 5', '-l %s' % splitlines, os.path.join(script_path, logfile)], cwd=tmpdir)
-store = pd.HDFStore(hdffile, "w")
+store = pd.HDFStore(hdffiletmp, "w")
 
 print("Spawning %d processing scripts" % numprocesses)
 procs = []
@@ -119,12 +121,22 @@ while True:
 	os.remove(fname)
 	print(">>> %s: %f" % (a[0], perf_counter()-t))
 
+store.close()
+
+print ("Reindexing HDF file")
+store = pd.HDFStore(hdffiletmp)
+db = store['db']
+db.to_hdf(hdffile, 'db', mode='w',format='table',index=['timestamp'],
+          data_columns=['action', 'username'])
+os.remove(hdffiletmp)
+store.close()
+
 print("Processing finished, memoizing data")
+store = pd.HDFStore(hdffile)
 for field, memoizer in memos.items():
 	store[field] = memoizer.to_series()
-
-store.close()
-shutil.rmtree(tmpdir)
-r.delete(r.keys(prefix+":*"))
-
 print("### Finished")
+store.close()
+
+shutil.rmtree(tmpdir)
+r.flushdb()

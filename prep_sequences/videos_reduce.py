@@ -20,10 +20,8 @@ def dump(arr, tmpdir):
 
 	idstr = str(uuid4())
 
-	with open(os.path.join(tmpdir, "sub", idstr), "wb") as dumpf:
+	with open(os.path.join(tmpdir, idstr), "wt") as dumpf:
 		dumpf.write(''.join(arr))
-		os.rename(os.path.join(tmpdir, "sub", idstr),
-				  os.path.join(tmpdir, idstr))
 
 	print("*** Dumping to %s" % idstr)
 
@@ -35,12 +33,16 @@ if len(argv) < 5:
 
 store = pd.HDFStore(argv[1])
 converter = ActionConverter(store)
-store_length = store['db'].username.max()
+store_length = len(store['username'])
 range_start = int(argv[2])
 range_jump = int(argv[3])
 working_dir = argv[4]
 print(store_length)
 event_arr = []
+if len(argv) > 5:
+        time_cutoff = int(argv[5])
+else:
+        time_cutoff = None
 
 i = 0
 cnt = 0
@@ -51,7 +53,7 @@ while c < store_length + 1:
 	cnt += 1
 
 	print("%d (%d): Processing user %d: " % (i, cnt, c))
-	events = converter.convert(c)
+	events = converter.convert(c, max_time = time_cutoff)
 	if not events is None:
 		event_arr.append(events)
 	else:
