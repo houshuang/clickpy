@@ -1,0 +1,1 @@
+* TODO somehow the repacking isn't happening with the latest version of log2h5 - the resulting h5 files don't have username and timestamp indices

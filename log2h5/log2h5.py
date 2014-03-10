@@ -80,7 +80,8 @@ os.mkdir(dumpdir)
 # make sure that Redis keyspace is empty
 r = redis.StrictRedis(host='localhost', decode_responses=True)
 if r.exists(prefix + ":finished"):
-	if force or ok_delete_p("Keys with prefix %s exist, delete all?" % prefix):
+	if force or \
+	   ok_delete_p("Keys with prefix %s exist, delete all?" % prefix):
 		r.flushdb()
 	else:
 		exit()
@@ -89,7 +90,8 @@ print("Splitting log file into %s" % tmpdir)
 r.set(prefix + ":split-finished", "0")
 splitfinished = False
 
-split = Popen(['split', '-a 5', '-l %s' % splitlines, os.path.join(script_path, logfile)], cwd=tmpdir)
+split = Popen(['split', '-a 5', '-l %s' % splitlines, \
+			   os.path.join(script_path, logfile)], cwd=tmpdir)
 store = pd.HDFStore(hdffiletmp, "w")
 
 print("Spawning %d processing scripts" % numprocesses)
