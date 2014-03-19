@@ -53,11 +53,14 @@ while c < store_length + 1:
 	cnt += 1
 
 	print("%d (%d): Processing user %d: " % (i, cnt, c))
-	events = converter.convert(c, max_time = time_cutoff)
-	if not events is None:
-		event_arr.append(events)
-	else:
-		print("None")
+	try:
+		events = converter.convert(c, max_time = time_cutoff)
+		if not events is None:
+			event_arr.append(events)
+		else:
+			print("None")
+	except:
+		print("User error %d" % c)
 	if i > 10:
 		i = 0
 		dump(event_arr, working_dir)
